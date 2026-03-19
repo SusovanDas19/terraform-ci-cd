@@ -1,17 +1,12 @@
+provider "aws" {
+  region = "us-east-2"
+}
 
-resource "aws_instance" "app" {
-  ami                    = ami-0b0b78dcacbab728f
-  instance_type          = var.instance_type
+resource "aws_instance" "my_ec2" {
+  ami           = " ami-0b0b78dcacbab728f"  # Amazon Linux (example)
+  instance_type = "t3.micro"
 
   tags = {
-    Name = "drift-demo-app"
+    Name = "simple-ec2"
   }
-
-  user_data = <<-EOF
-              #!/bin/bash
-              dnf install -y nginx
-              systemctl enable nginx
-              systemctl start nginx
-              echo "drift-demo-$(hostname)" > /usr/share/nginx/html/index.html
-              EOF
 }

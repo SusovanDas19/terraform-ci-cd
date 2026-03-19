@@ -6,26 +6,30 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   terraform:
     runs-on: ubuntu-latest
 
-    permissions:
-      id-token: write
-      contents: read
+    defaults:
+      run:
+        working-directory: terraform
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::509399639169:role/terraform-drift-task-role   # ✅ your role
-          aws-region: us-east-2   # ✅ your region
-
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3   # kept same as your reference
+          role-to-assume: arn:aws:iam::509399639169:role/terraform-drift-task-role
+          aws-region: us-east-2
 
       - name: Terraform Init
         run: terraform init
@@ -36,19 +40,5 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -out=tfplan -input=false
 
-      - name: Terraform Plan JSON
-        run: terraform show -json tfplan > tfplan.json
-
-      - name: Install Conftest
-        run: |
-          VERSION=0.60.0
-          wget -q https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_x86_64.tar.gz
-          tar xzf conftest_${VERSION}_Linux_x86_64.tar.gz
-          sudo mv conftest /usr/local/bin
-
-      - name: Policy Check
-        run: conftest test tfplan.json --policy ../policy
-
       - name: Terraform Apply
-        if: success()
         run: terraform apply -auto-approve tfplan

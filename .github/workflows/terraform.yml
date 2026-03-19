@@ -6,43 +6,49 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
-
 jobs:
   terraform:
     runs-on: ubuntu-latest
 
+    permissions:
+      id-token: write
+      contents: read
+
     steps:
-      - name: Checkout
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.9.5
-
-      - name: Configure AWS credentials
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::509399639169:role/terraform-drift-task-role
-          aws-region: us-east-2
+          role-to-assume: arn:aws:iam::509399639169:role/terraform-drift-task-role   # ✅ your role
+          aws-region: us-east-2   # ✅ your region
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3   # kept same as your reference
 
       - name: Terraform Init
         run: terraform init
 
+      - name: Terraform Validate
+        run: terraform validate
+
       - name: Terraform Plan
         run: terraform plan -out=tfplan -input=false
 
-      - name: Lint Policy Check
+      - name: Terraform Plan JSON
+        run: terraform show -json tfplan > tfplan.json
+
+      - name: Install Conftest
         run: |
-          curl -s https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
-          tflint --init
-          tflint -f compact
-        continue-on-error: true  # Optional
+          VERSION=0.60.0
+          wget -q https://github.com/open-policy-agent/conftest/releases/download/v${VERSION}/conftest_${VERSION}_Linux_x86_64.tar.gz
+          tar xzf conftest_${VERSION}_Linux_x86_64.tar.gz
+          sudo mv conftest /usr/local/bin
+
+      - name: Policy Check
+        run: conftest test tfplan.json --policy ../policy
 
       - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
+        if: success()
         run: terraform apply -auto-approve tfplan
-

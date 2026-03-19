@@ -1,0 +1,49 @@
+name: Terraform CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: terraform
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::509399639169:role/terraform-drift-task-role
+          aws-region: us-east-2
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan
+
+      - name: Policy Check
+        run: |
+          python3 -m pip install --upgrade pip
+          pip3 install checkov
+          terraform show -json tfplan > tfplan.json
+          checkov -f tfplan.json --framework terraform_plan
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
